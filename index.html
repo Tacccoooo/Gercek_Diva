@@ -486,6 +486,355 @@
     for (let i = 0; i < 30; i++) { const a = r(0, 6.283), h = r(1, 4); parcaEkle(q.left + q.width / 2, q.top + q.height / 2, Math.cos(a) * h, Math.sin(a) * h); }
   });
 
+
+/* ====== REALISTIC EYFEL KULESİ ====== */
+
+function kuleSVG() {
+  const W = 200;
+  const H = 400;
+  const CX = 100;
+
+  const f = n => Number(n).toFixed(2);
+
+  // Kule silueti
+  const widthAt = y => {
+    const t = Math.max(0, Math.min(1, y / 400));
+    return 74 * Math.pow(1 - t, 1.42) + 1.1;
+  };
+
+  // Ana ayakların içeri kıvrılan geometrisi
+  const legX = (side, y) => {
+    const t = y / 400;
+    const curve = 35 * Math.pow(1 - t, 2.1);
+    return CX + side * (widthAt(y) - curve * (1 - t));
+  };
+
+  const parts = [];
+  const details = [];
+  const lights = [];
+
+  // Ana metal renkleri
+  const defs = `
+    <defs>
+      <linearGradient id="kg" x1="0" y1="400" x2="0" y2="0"
+        gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="#a65d32"/>
+        <stop offset=".3" stop-color="#d18b49"/>
+        <stop offset=".65" stop-color="#e9b96d"/>
+        <stop offset="1" stop-color="#fff0c1"/>
+      </linearGradient>
+
+      <linearGradient id="metalLeft" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#754126"/>
+        <stop offset=".45" stop-color="#e5a75e"/>
+        <stop offset="1" stop-color="#ffdf9d"/>
+      </linearGradient>
+
+      <linearGradient id="metalRight" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#ffe4a7"/>
+        <stop offset=".5" stop-color="#c17b3f"/>
+        <stop offset="1" stop-color="#633b27"/>
+      </linearGradient>
+
+      <linearGradient id="platform" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#fff0bb"/>
+        <stop offset=".4" stop-color="#d99a52"/>
+        <stop offset="1" stop-color="#75452c"/>
+      </linearGradient>
+
+      <radialGradient id="glow">
+        <stop offset="0" stop-color="#fff8d9" stop-opacity=".95"/>
+        <stop offset=".3" stop-color="#ffd77f" stop-opacity=".4"/>
+        <stop offset="1" stop-color="#ffb84d" stop-opacity="0"/>
+      </radialGradient>
+
+      <filter id="softGlow" x="-100%" y="-100%"
+        width="300%" height="300%">
+        <feGaussianBlur stdDeviation="2.2"/>
+      </filter>
+
+      <filter id="smallGlow" x="-100%" y="-100%"
+        width="300%" height="300%">
+        <feGaussianBlur stdDeviation=".8"/>
+      </filter>
+    </defs>
+  `;
+
+  // Ana ayaklar
+  for (const side of [-1, 1]) {
+    let d = "";
+
+    for (let i = 0; i <= 50; i++) {
+      const y = 400 - i * 8;
+      const x = legX(side, y);
+      d += `${i === 0 ? "M" : "L"}${f(x)},${f(y)} `;
+    }
+
+    parts.push(`
+      <path d="${d}"
+        fill="none"
+        stroke="${side < 0 ? "url(#metalLeft)" : "url(#metalRight)"}"
+        stroke-width="3.2"
+        stroke-linecap="round"/>
+    `);
+
+    // Ayakların iç kenarları
+    let inner = "";
+
+    for (let i = 0; i <= 50; i++) {
+      const y = 400 - i * 8;
+      const x = legX(side, y) - side * (3 + 2 * (1 - y / 400));
+      inner += `${i === 0 ? "M" : "L"}${f(x)},${f(y)} `;
+    }
+
+    parts.push(`
+      <path d="${inner}"
+        fill="none"
+        stroke="#ffe0a0"
+        stroke-opacity=".55"
+        stroke-width=".85"/>
+    `);
+  }
+
+  // Alt bölüm kemerleri
+  parts.push(`
+    <path d="
+      M26 400
+      C39 357 62 330 100 330
+      C138 330 161 357 174 400"
+      fill="none"
+      stroke="url(#kg)"
+      stroke-width="3"
+    />
+
+    <path d="
+      M35 400
+      C47 365 69 342 100 342
+      C131 342 153 365 165 400"
+      fill="none"
+      stroke="#e8b36e"
+      stroke-width="1"
+      opacity=".8"
+    />
+  `);
+
+  // Ana kafes sistemi
+  function lattice(y1, y2, divisions, density) {
+    const step = (y2 - y1) / divisions;
+
+    for (let i = 0; i < divisions; i++) {
+      const ya = y1 + i * step;
+      const yb = ya + step;
+
+      const lx1 = legX(-1, ya);
+      const lx2 = legX(-1, yb);
+      const rx1 = legX(1, ya);
+      const rx2 = legX(1, yb);
+
+      const mid = (ya + yb) / 2;
+
+      // Çapraz demirler
+      parts.push(`
+        <path d="
+          M${f(lx1)},${f(ya)}
+          L${f(rx2)},${f(yb)}
+          M${f(rx1)},${f(ya)}
+          L${f(lx2)},${f(yb)}
+        "
+        fill="none"
+        stroke="#e9b875"
+        stroke-width="${i % 2 === 0 ? 1.05 : .72}"
+        opacity=".88"
+        />
+      `);
+
+      // Yatay bağlantılar
+      parts.push(`
+        <path d="
+          M${f(lx2)},${f(yb)}
+          L${f(rx2)},${f(yb)}
+        "
+        stroke="#ffdda0"
+        stroke-width=".65"
+        opacity=".7"
+      />
+      `);
+
+      // İç destekler
+      if (density && i % 2 === 0) {
+        const cx = (lx2 + rx2) / 2;
+
+        parts.push(`
+          <path d="
+            M${f(cx)},${f(ya)}
+            L${f(lx2)},${f(yb)}
+            M${f(cx)},${f(ya)}
+            L${f(rx2)},${f(yb)}
+          "
+          stroke="#c88a4c"
+          stroke-width=".55"
+          opacity=".8"
+          />
+        `);
+      }
+
+      // Bağlantı noktaları
+      if (i % 2 === 0) {
+        for (const x of [lx2, rx2]) {
+          details.push(`
+            <circle cx="${f(x)}" cy="${f(yb)}"
+              r=".75" fill="#fff0bd"/>
+          `);
+        }
+      }
+
+      // Kafesin merkezindeki küçük ışıklar
+      if (i % 3 === 0) {
+        lights.push(`
+          <circle class="nokta"
+            cx="${f((lx2 + rx2) / 2)}"
+            cy="${f(mid)}"
+            r=".8"
+            fill="#fff0c0"
+            style="animation-delay:${(i * .17).toFixed(2)}s"
+          />
+        `);
+      }
+    }
+  }
+
+  lattice(400, 290, 15, true);
+  lattice(290, 195, 13, true);
+  lattice(195, 105, 12, true);
+  lattice(105, 12, 13, false);
+
+  // Platformlar
+  function platform(y, thickness, extension) {
+    const w = widthAt(y) + extension;
+
+    return `
+      <g>
+        <rect x="${f(CX - w)}"
+          y="${f(y - thickness / 2)}"
+          width="${f(w * 2)}"
+          height="${thickness}"
+          rx=".8"
+          fill="url(#platform)"/>
+
+        <path d="
+          M${f(CX - w)},${f(y - thickness / 2)}
+          L${f(CX + w)},${f(y - thickness / 2)}
+        "
+        stroke="#fff1c9"
+        stroke-width=".9"/>
+
+        <path d="
+          M${f(CX - w * .85)},${f(y + thickness / 2)}
+          L${f(CX)},${f(y + thickness * 1.7)}
+          L${f(CX + w * .85)},${f(y + thickness / 2)}
+        "
+        fill="none"
+        stroke="#c18a50"
+        stroke-width=".9"/>
+      </g>
+    `;
+  }
+
+  parts.push(platform(290, 5, 5));
+  parts.push(platform(195, 4, 3.5));
+  parts.push(platform(105, 3, 2.5));
+
+  // Platform korkulukları
+  for (const y of [286, 191, 102]) {
+    const w = widthAt(y) + 4;
+
+    parts.push(`
+      <path d="
+        M${f(CX - w)},${f(y - 3)}
+        L${f(CX + w)},${f(y - 3)}
+        M${f(CX - w)},${f(y - 3)}
+        L${f(CX - w)},${f(y - 6)}
+        M${f(CX + w)},${f(y - 3)}
+        L${f(CX + w)},${f(y - 6)}
+      "
+      fill="none"
+      stroke="#ffdf9f"
+      stroke-width=".65"
+      opacity=".85"
+    />
+    `);
+  }
+
+  // Merkezdeki asansör ve dikey taşıyıcı yapı
+  parts.push(`
+    <path d="
+      M97 290 L97 18
+      M103 290 L103 18
+      M97 290 L103 290
+    "
+    stroke="#e9bd7e"
+    stroke-width=".8"
+    opacity=".8"
+    />
+  `);
+
+  // Tepe anteni
+  parts.push(`
+    <g>
+      <path d="M100 13 L100 0"
+        stroke="#ffe5b1"
+        stroke-width="1.3"/>
+
+      <path d="
+        M96 14 L104 14
+        M97 10 L103 10
+        M98 6 L102 6
+      "
+      stroke="#e4ae69"
+      stroke-width=".7"/>
+
+      <circle cx="100" cy="2" r="1.8" fill="#fff9df"/>
+    </g>
+  `);
+
+  // Işıklandırma
+  const lighting = `
+    <g class="isik">
+      <circle cx="100" cy="6" r="13"
+        fill="url(#glow)" filter="url(#softGlow)"/>
+
+      <circle cx="100" cy="195" r="8"
+        fill="url(#glow)" opacity=".6"/>
+
+      ${lights.join("")}
+
+      <circle cx="100" cy="6" r="1.8"
+        fill="#fff" filter="url(#smallGlow)"/>
+    </g>
+  `;
+
+  return `
+    <svg viewBox="0 0 200 400"
+      preserveAspectRatio="xMidYMax meet"
+      xmlns="http://www.w3.org/2000/svg">
+
+      ${defs}
+
+      <!-- Ana metal iskelet -->
+      ${parts.join("")}
+
+      <!-- Bağlantı detayları -->
+      <g>${details.join("")}</g>
+
+      <!-- Işıklar -->
+      ${lighting}
+
+    </svg>
+  `;
+}
+
+document.getElementById("kule").innerHTML = kuleSVG();
+  
   /* ====== ZARFA TIKLAMA ====== */
   const zarf = document.getElementById("zarf");
   function ac() {
